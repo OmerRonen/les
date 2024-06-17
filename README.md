@@ -1,6 +1,6 @@
 # ScaLES: Scalable Latent Exploration Score for Pre-Trained Generative Networks
 
-### [Arxiv link]()
+### [Arxiv link](https://arxiv.org/abs/2406.09657)
 
 ![Alt Text](figures/ScaLES.png)
 
@@ -11,7 +11,13 @@ This repository contains the implementation of ScaLES, a latent exploration scor
 If you use ScaLES or any of the resources in this repo in your work, please use the following citation:
 
 ```bibtex
-
+@misc{ronen2024scales,
+      title={ScaLES: Scalable Latent Exploration Score for Pre-Trained Generative Networks}, 
+      author={Omer Ronen and Ahmed Imtiaz Humayun and Randall Balestriero and Richard Baraniuk and Bin Yu},
+      year={2024},
+      eprint={2406.09657},
+      archivePrefix={arXiv},
+      primaryClass={id='cs.LG'}}
 ```
 
 </details>
