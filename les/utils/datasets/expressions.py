@@ -139,20 +139,17 @@ def load_data(data_path):
 
 
 def get_expressions_data(n=None, seed=42):
-    # f_name = "data/grammer/eq2_grammar_dataset_oh.pickle"
-    # if os.path.isfile(f_name):
-    #     data = pickle.load(open(f_name, "rb"))
-    #     return torch.from_numpy(data).float()#.transpose(1, 2)
     data_path = os.path.join(
-        os.path.dirname(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        ),
         "data",
         "grammer",
         "eq2_grammar_dataset.h5",
     )
-    # data_path = 'data/grammer/eq2_grammar_dataset.h5'
-    data = load_data(data_path)
+    try:
+        data = load_data(data_path)
+    except Exception:
+        raise Exception(
+            f"File {data_path} not found, please make sure to download it from git"
+        )
     # Turn it into a float32 PyTorch Tensor
     train_dataset = torch.from_numpy(data).float()
     GCFG = nltk.CFG.fromstring(gram)

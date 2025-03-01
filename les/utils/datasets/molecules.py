@@ -13,174 +13,23 @@ import torch.nn.functional as F
 from rdkit import Chem
 from rdkit.Chem import Descriptors, rdmolops, Crippen
 from rdkit.Contrib.SA_Score import sascorer
+from guacamol import standard_benchmarks
 
 # from tdc import Oracle
 from tqdm import tqdm
 
-from lolbo.utils.mol_utils.selfies_vae.data import DEFAULT_SELFIES_VOCAB
 from les import LOGGER
-from ..utils import one_hot_encode, one_hot_to_eq
-from ugo.utils.quality_filters import pass_quality_filter
+from les.utils.utils import one_hot_encode, one_hot_to_eq
 
-VOCAB = [
-    "C",
-    "(",
-    ")",
-    "c",
-    "1",
-    "2",
-    "o",
-    "=",
-    "O",
-    "N",
-    "3",
-    "F",
-    "[",
-    "@",
-    "H",
-    "]",
-    "n",
-    "-",
-    "#",
-    "S",
-    "l",
-    "+",
-    "s",
-    "B",
-    "r",
-    "/",
-    "4",
-    "\\",
-    "5",
-    "6",
-    "7",
-    "I",
-    "P",
-    "8",
-    " ",
-]
-EOS_TOKEN_IDX = len(VOCAB) - 1
-VOCAB_SIZE = len(VOCAB)
-VOCAB = {v: i for i, v in enumerate(VOCAB)}
-EXPR_LENGTH = 120
 
-EXPR_LENGTH_SELFIES = 72
-SELFIES_VOCAB = [
-    "[#Branch1]",
-    "[#Branch2]",
-    "[#C-1]",
-    "[#C]",
-    "[#N+1]",
-    "[#N]",
-    "[#O+1]",
-    "[=B]",
-    "[=Branch1]",
-    "[=Branch2]",
-    "[=C-1]",
-    "[=C]",
-    "[=N+1]",
-    "[=N-1]",
-    "[=NH1+1]",
-    "[=NH2+1]",
-    "[=N]",
-    "[=O+1]",
-    "[=OH1+1]",
-    "[=O]",
-    "[=PH1]",
-    "[=P]",
-    "[=Ring1]",
-    "[=Ring2]",
-    "[=S+1]",
-    "[=SH1]",
-    "[=S]",
-    "[=Se+1]",
-    "[=Se]",
-    "[=Si]",
-    "[B-1]",
-    "[BH0]",
-    "[BH1-1]",
-    "[BH2-1]",
-    "[BH3-1]",
-    "[B]",
-    "[Br+2]",
-    "[Br-1]",
-    "[Br]",
-    "[Branch1]",
-    "[Branch2]",
-    "[C+1]",
-    "[C-1]",
-    "[CH1+1]",
-    "[CH1-1]",
-    "[CH1]",
-    "[CH2+1]",
-    "[CH2]",
-    "[C]",
-    "[Cl+1]",
-    "[Cl+2]",
-    "[Cl+3]",
-    "[Cl-1]",
-    "[Cl]",
-    "[F+1]",
-    "[F-1]",
-    "[F]",
-    "[H]",
-    "[I+1]",
-    "[I+2]",
-    "[I+3]",
-    "[I]",
-    "[N+1]",
-    "[N-1]",
-    "[NH0]",
-    "[NH1+1]",
-    "[NH1-1]",
-    "[NH1]",
-    "[NH2+1]",
-    "[NH3+1]",
-    "[N]",
-    "[O+1]",
-    "[O-1]",
-    "[OH0]",
-    "[O]",
-    "[P+1]",
-    "[PH1]",
-    "[PH2+1]",
-    "[P]",
-    "[Ring1]",
-    "[Ring2]",
-    "[S+1]",
-    "[S-1]",
-    "[SH1]",
-    "[S]",
-    "[Se+1]",
-    "[Se-1]",
-    "[SeH1]",
-    "[SeH2]",
-    "[Se]",
-    "[Si-1]",
-    "[SiH1-1]",
-    "[SiH1]",
-    "[SiH2]",
-    "[Si]",
-    "[C@@H1]",
-    " ",
-]
-# load missed tokens.yaml
-missed_tokens_file = "missed_tokens.yaml"
-if os.path.exists(missed_tokens_file):
-    # read the yaml file
-    with open(missed_tokens_file, "r") as f:
-        missed_tokens = yaml.safe_load(f)
-        # add missed tokens to the vocab
-        for token in missed_tokens:
-            if token not in SELFIES_VOCAB:
-                SELFIES_VOCAB.append(token)
-        SELFIES_VOCAB = {v: i for i, v in enumerate(SELFIES_VOCAB)}
-        SELFIES_VOCAB_INV = {v: k for k, v in SELFIES_VOCAB.items()}
-        # print(f"vocab size: {len(SELFIES_VOCAB)}")
-SELFIES_VOCAB = {v: i for i, v in enumerate(SELFIES_VOCAB)}
-SELFIES_VOCAB_OLD = {v: i for i, v in enumerate(DEFAULT_SELFIES_VOCAB)}
+VOCAB = yaml.load(open("data/molecules/vocab.yaml", "r"), Loader=yaml.FullLoader)
+SELFIES_VOCAB = yaml.load(
+    open("data/molecules/vocab_selfies.yaml", "r"), Loader=yaml.FullLoader
+)
+SELFIES_VOCAB_OLD = yaml.load(
+    open("data/molecules/vocab_selfies_pretrained.yaml", "r"), Loader=yaml.FullLoader
+)
 
-from guacamol import standard_benchmarks
 
 med1 = standard_benchmarks.median_camphor_menthol()  #'Median molecules 1'
 med2 = standard_benchmarks.median_tadalafil_sildenafil()  #'Median molecules 2',
@@ -237,73 +86,18 @@ def verify_smile(smile):
     )
 
 
-def save_train_stats(smiles, file_name):
-    logP_values = []
-    SAS_values = []
-    cycle_values = []
-    for smile in tqdm(smiles):
-        try:
-            mol = rdkit.Chem.MolFromSmiles(smile)
-
-            logP_score = Descriptors.MolLogP(mol)
-
-            SAS_score = -sascorer.calculateScore(mol)
-
-            cycle_list = nx.cycle_basis(nx.Graph(rdmolops.GetAdjacencyMatrix(mol)))
-            if len(cycle_list) == 0:
-                cycle_length = 0
-            else:
-                cycle_length = max([len(j) for j in cycle_list])
-            if cycle_length <= 6:
-                cycle_length = 0
-            else:
-                cycle_length = cycle_length - 6
-
-            cycle_score = -cycle_length
-
-            logP_values.append(logP_score)
-            SAS_values.append(SAS_score)
-            cycle_values.append(cycle_score)
-        except:
-            pass
-
-    logP_mean = np.mean(logP_values)
-    logP_std = np.std(logP_values)
-
-    SAS_mean = np.mean(SAS_values)
-    SAS_std = np.std(SAS_values)
-
-    cycles_mean = np.mean(cycle_values)
-    cycles_std = np.std(cycle_values)
-
-    train_stats = {
-        "logP_mean": logP_mean,
-        "logP_std": logP_std,
-        "SAS_mean": SAS_mean,
-        "SAS_std": SAS_std,
-        "cycles_mean": cycles_mean,
-        "cycles_std": cycles_std,
-    }
-
-    with open(file_name, "wb") as f:
-        pickle.dump(train_stats, f)
-
-
-def calculate_logP(smile, option):
-    mol = Chem.MolFromSmiles(smile)
-    if option == 1:
-        return Crippen.MolLogP(mol)
-    elif option == 2:
-        return Descriptors.MolLogP(mol)
-
-
 def compute_target_logP(smile, default_value, norm=True):
-    train_stats = pickle.load(
-        open(
-            "/accounts/campus/omer_ronen/projects/lso_splines/data/molecules/train_stats.pkl",
-            "rb",
+    try:
+        train_stats = pickle.load(
+            open(
+                "data/molecules/train_stats.pkl",
+                "rb",
+            )
         )
-    )
+    except Exception:
+        raise Exception(
+            "Train stats file (data/molecules/train_stats.pkl) not found, please make sure to download it from git"
+        )
     if not verify_smile(smile):
         return default_value
     try:
@@ -385,30 +179,9 @@ def get_black_box_objective_molecules(
     return torch.tensor(oracle_values)
 
 
-def translate_to_selfies(smiles_file):
-    out_file = smiles_file.replace(".smi", ".self")
-    # if os.path.exists(out_file):
-    #     return
-    smiles = open(smiles_file, "r").read().splitlines()
-    selfies = []
-    # max_len = 0
-    with open(out_file, "w") as f:
-        for smile in tqdm(smiles):
-            if pass_quality_filter([smile])[0] == 0:
-                continue
-            try:
-                selfie = sf.encoder(smile)
-                selfies.append(selfie)
-                # max_len = max(max_len, len(selfie))
-                f.write(selfie + "\n")
-            except:
-                pass
-    # print(max_len)
-
-
-def get_molecule_data(n=None, max_length=120, selfies=False, save=False):
+def get_molecule_data(n=None, selfies=False, save=False):
     # read the data
-    f_name_pre = "/accounts/campus/omer_ronen/projects/lso_splines/data/molecules"
+    f_name_pre = "data/molecules"
     f_name_pickle = f"{f_name_pre}/250k_rndm_zinc_drugs_clean.pkl"
     vcb = SELFIES_VOCAB if selfies else VOCAB
     if selfies:
@@ -421,7 +194,12 @@ def get_molecule_data(n=None, max_length=120, selfies=False, save=False):
             f_name = f"{f_name}.self"
         else:
             f_name = f"{f_name}.smi"
-        expressions_lst = open(f_name, "r").read().splitlines()
+        try:
+            expressions_lst = open(f_name, "r").read().splitlines()
+        except Exception:
+            raise Exception(
+                f"File {f_name} not found, please make sure to download it from git"
+            )
         # convert to one hot
         expressions_lst_oh = [
             one_hot_encode(e, vcb, max_length=None) for e in tqdm(expressions_lst)
@@ -446,7 +224,14 @@ def get_molecule_data(n=None, max_length=120, selfies=False, save=False):
 
 
 if __name__ == "__main__":
-    # translate_to_selfies("data/molecules/250k_rndm_zinc_drugs_clean.smi")
-    ds = get_molecule_data(n=None, selfies=True, max_length=72, save=False)
-    print(ds.shape)
-    # dataset = get_molecule_data(n=20000)
+    # # translate_to_selfies("data/molecules/250k_rndm_zinc_drugs_clean.smi")
+    # ds = get_molecule_data(n=None, selfies=True, max_length=72, save=False)
+    # print(ds.shape)
+    # # dataset = get_molecule_data(n=20000)
+    # save vocab, vocab_selfies and vocab_selfies_old as yaml files
+    with open("data/molecules/vocab.yaml", "w") as f:
+        yaml.dump(VOCAB, f)
+    with open("data/molecules/vocab_selfies.yaml", "w") as f:
+        yaml.dump(SELFIES_VOCAB, f)
+    with open("data/molecules/vocab_selfies_pretrained.yaml", "w") as f:
+        yaml.dump(SELFIES_VOCAB_OLD, f)

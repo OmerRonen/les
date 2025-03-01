@@ -1,0 +1,6 @@
+data/molecules/train_stats.pkl filter=lfs diff=lfs merge=lfs -text
+data/molecules/250k_rndm_zinc_drugs_clean.pkl filter=lfs diff=lfs merge=lfs -text
+data/molecules/250k_rndm_zinc_drugs_clean.self filter=lfs diff=lfs merge=lfs -text
+data/molecules/250k_rndm_zinc_drugs_clean_selfies.pkl filter=lfs diff=lfs merge=lfs -text
+data/molecules/250k_rndm_zinc_drugs_clean.smi filter=lfs diff=lfs merge=lfs -text
+data/grammer/eq2_grammar_dataset.h5 filter=lfs diff=lfs merge=lfs -text

@@ -150,30 +150,27 @@ def get_methods_auc(model: VAE, dataset: torch.Tensor, model_name: str, batch_si
     # return auroc_results
 
 
-def get_tensor_data(ds, n=500, old=False):
+def get_tensor_data(ds, n=500, pretrained=False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if ds == "smiles":
         return array_to_tensor(get_molecule_data(n=n), device)
     elif ds == "expressions":
         return array_to_tensor(get_expressions_data(n=n), device)
-    elif ds == "selfies" and not old:
+    elif ds == "selfies" and not pretrained:
         return array_to_tensor(get_molecule_data(n=n, selfies=True), device)
-    elif ds == "selfies" and old:
-        ds = get_selfies_data()
-        # sample 500 random indices
-        ind = torch.randperm(len(ds))[:n]
-        ds_n = ds[ind]
-        return ds_n
+    elif ds == "selfies" and pretrained:
+        return array_to_tensor(get_selfies_data(n=n), device)
     else:
         raise ValueError(f"Dataset {ds} not supported")
 
 
-def main(dataset, architecture, beta):
-    LOGGER.info(f"Dataset: {dataset}, architecture: {architecture}, beta: {beta}")
-    n = 50
+def main(dataset: str, architecture: str, beta: float, pretrained: bool = False):
+    n = 500
 
-    dataset_tensor = get_tensor_data(dataset, n=n)
-    vae, _ = get_vae(dataset=dataset, architecture=architecture, beta=beta)
+    dataset_tensor = get_tensor_data(dataset, n=n, pretrained=pretrained)
+    vae = get_vae(
+        dataset=dataset, architecture=architecture, beta=beta, pretrained=pretrained
+    )
     if torch.cuda.is_available():
         vae = vae.to("cuda")
         vae.decoder = vae.decoder.to("cuda")

@@ -1,4 +1,6 @@
 import torch
+
+import numpy as np
 from torch import nn
 from torch.nn import functional as F
 
@@ -87,3 +89,73 @@ def calculate_uncertainty(X, model, n_models=10, n_preds=10, dataset="expression
         return -torch.log(torch.tensor(n_preds).float()) + torch.stack(
             mi_list, dim=1
         ).logsumexp(dim=1)
+
+
+def calculate_uncertainty_threshold(dataset_name, model, n_data=1000):
+    from les.utils.datasets.utils import get_dataset
+
+    dataset = get_dataset(dataset_name)
+    # sample n_data from the dataset
+    ds_train = dataset["train"]
+    sample_idx = np.random.randint(0, len(ds_train), n_data)
+    X = ds_train[sample_idx]
+    Z = model.encode(X)
+    uncertainty = calculate_uncertainty(Z, model).detach().cpu().numpy()
+    # remove nans
+    uncertainty = uncertainty[~np.isnan(uncertainty)]
+    qunatiles = {
+        "90": float(np.percentile(uncertainty, 90)),
+        "95": float(np.percentile(uncertainty, 95)),
+        "99": float(np.percentile(uncertainty, 99)),
+        "max": float(np.max(uncertainty)),
+    }
+
+    return qunatiles
+
+
+def save_uncertainty_thresholds():
+    import os
+    import yaml
+
+    from les.nets.utils import get_vae
+
+    datasets = [
+        ("expressions", "gru", 0.05),
+        ("expressions", "gru", 0.1),
+        ("expressions", "gru", 1),
+        ("expressions", "lstm", 0.05),
+        ("expressions", "lstm", 0.1),
+        ("expressions", "lstm", 1),
+        ("expressions", "transformer", 0.05),
+        ("expressions", "transformer", 0.1),
+        ("expressions", "transformer", 1),
+        ("smiles", "gru", 0.05),
+        ("smiles", "gru", 0.1),
+        ("smiles", "gru", 1),
+        ("smiles", "lstm", 0.05),
+        ("smiles", "lstm", 0.1),
+        ("smiles", "lstm", 1),
+        ("smiles", "transformer", 0.05),
+        ("smiles", "transformer", 0.1),
+        ("smiles", "transformer", 1),
+        ("selfies", "transformer", 0.05),
+        ("selfies", "transformer", 0.1),
+        ("selfies", "transformer", 1),
+        ("selfies", "transformer", "pretrained"),
+    ]
+    quantiles_path = "data/uncertainty_thresholds"
+    os.makedirs(quantiles_path, exist_ok=True)
+    for dataset, model_name, beta in datasets:
+        if beta == "pretrained":
+            model = get_vae(dataset, model_name, 1, pretrained=True)
+        else:
+            model = get_vae(dataset, model_name, beta)
+        qunatiles = calculate_uncertainty_threshold(dataset, model, n_data=1000)
+        with open(
+            os.path.join(quantiles_path, f"{dataset}_{model_name}_{beta}.yaml"), "w"
+        ) as f:
+            yaml.dump(qunatiles, f)
+
+
+if __name__ == "__main__":
+    save_uncertainty_thresholds()
