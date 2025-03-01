@@ -9,6 +9,8 @@ import torch
 from lightning.pytorch.loggers import TensorBoardLogger
 from torch import Tensor, nn
 from torch.nn import functional as F
+
+from ugo.utils.quality_filters import pass_quality_filter
 from ....utils.mol_utils.selfies_vae.data import SELFIESDataModule, SELFIESDataset
 from torch.optim import Adam
 
@@ -101,12 +103,14 @@ class InfoTransformerVAE(LightningModule):
         self.bottleneck_size = bottleneck_size
         self.d_model = d_model
         self.is_autoencoder = is_autoencoder
+        self.eps_std = 1
 
         # TODO
         self.kl_factor = kl_factor
 
         self.min_posterior_std = min_posterior_std
         encoder_embedding_dim = 2 * d_model
+        self.latent_dim = encoder_embedding_dim
 
         self.encoder_token_embedding = nn.Embedding(num_embeddings=self.vocab_size, embedding_dim=encoder_embedding_dim)
         self.encoder_position_encoding = PositionalEncoding(encoder_embedding_dim, dropout=encoder_dropout,
@@ -153,7 +157,10 @@ class InfoTransformerVAE(LightningModule):
         mask[torch.arange(0, tokens.shape[0]), inds] = False
         return mask
 
-    def encode(self, tokens, as_probs=False):
+    def encode(self, tokens, as_probs=False, add_noise=True):
+        device =  tokens.device
+        self.encoder_token_embedding = self.encoder_token_embedding.to(device=device, dtype=self.dtype)
+        self.encoder_position_encoding = self.encoder_position_encoding.to(device=device, dtype=self.dtype)
         if as_probs:
             embed = tokens @ self.encoder_token_embedding.weight
         else:
@@ -162,7 +169,7 @@ class InfoTransformerVAE(LightningModule):
         embed = self.encoder_position_encoding(embed)
 
         pad_mask = self.generate_pad_mask(tokens)
-        self.encoder = self.encoder.to(device=self.device, dtype=self.dtype)
+        self.encoder = self.encoder.to(device=device, dtype=self.dtype)
         encoding = self.encoder(embed, src_key_padding_mask=pad_mask)
         mu = encoding[..., :self.d_model]
         sigma = F.softplus(encoding[..., self.d_model:]) + self.min_posterior_std
@@ -170,6 +177,8 @@ class InfoTransformerVAE(LightningModule):
         if self.bottleneck_size is not None:
             mu = mu[:, :self.bottleneck_size, :]
             sigma = sigma[:, :self.bottleneck_size, :]
+        if not add_noise:
+            return mu
 
         return mu, sigma
 
@@ -203,14 +212,21 @@ class InfoTransformerVAE(LightningModule):
             self.decoder.train()
         n = z.shape[0]
         tokens = torch.zeros(n, 1, device=self.device).long()  # Start token is 0, stop token is 1
+        # print(f"z device: {z.device}, tokens device: {tokens.device}")
+        self.decoder_token_embedding = self.decoder_token_embedding.to(device=self.device, dtype=self.dtype)
+        self.decoder_position_encoding = self.decoder_position_encoding.to(device=self.device, dtype=self.dtype)
+        self.decoder = self.decoder.to(device=self.device, dtype=self.dtype)
+        # self.decoder_token_unembedding = self.decoder_token_unembedding.to(device=self.device)
         # random_gumbels = torch.zeros(n, 0, self.vocab_size, device=self.device)
         # while True:  # Loop until every molecule hits a stop token
         for i in range(self.max_string_length):  # Loop until every molecule hits a stop token
             tgt = self.decoder_token_embedding(tokens)
             tgt = self.decoder_position_encoding(tgt)
             tgt_mask = nn.Transformer.generate_square_subsequent_mask(tokens.shape[-1]).to(device = self.device, dtype = self.dtype)
-
+            tgt_mask = tgt_mask.to(device=self.device, dtype=self.dtype)
             decoding = self.decoder(tgt=tgt, memory=z, tgt_mask=tgt_mask)
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            self.decoder_token_unembedding = nn.Parameter(self.decoder_token_unembedding.to(device))
             logits = decoding @ self.decoder_token_unembedding
             # sample, randoms = gumbel_softmax(logits, dim=-1, hard=True, return_randoms=True)
 
@@ -218,6 +234,7 @@ class InfoTransformerVAE(LightningModule):
             tokens = torch.cat([tokens, logits[:, -1, :].argmax(dim=-1)[:, None]], dim=-1)
 
         return logits
+
 
     @torch.no_grad()
     def sample(self, n: int = -1, z: Tensor = None, differentiable: bool = False, return_logits: bool = False):
@@ -266,6 +283,17 @@ class InfoTransformerVAE(LightningModule):
         v = [is_valid_molecule(self.dataset.decode(s)) for s in x]
 
         return torch.tensor(v, dtype=torch.float, device=device)
+    
+    def get_decoding_quality(self, z):
+        x = self.decode_z(z)
+        device = x.device
+        x = x.cpu().argmax(dim=-1)
+        # x = x.long()
+        v = [self.dataset.decode(s) for s in x]
+        quality = [pass_quality_filter(s) for s in v]
+        return quality
+
+        # retsurn torch.tensor(v, dtype=torch.float, device=device)
 
     def forward(self, tokens):
         mu, sigma = self.encode(tokens)

@@ -1,23 +1,25 @@
-# ScaLES: Scalable Latent Exploration Score for Pre-Trained Generative Networks
+# Mitigating over-exploration in latent space optimization using LES
 
 ### [Arxiv link](https://arxiv.org/abs/2406.09657)
 
-![Alt Text](figures/ScaLES.png)
+![Alt Text](figures/LES.png)
 
-This repository contains the implementation of ScaLES, a latent exploration score for generative networks, by Omer Ronen, Ahmed Imtiaz Humayun, Randall Balestriero, Richard Baraniuk, and Bin Yu.
+This repository contains the implementation of the paper Mitigating over-exploration in latent space optimization using LES, by Omer Ronen, Ahmed Imtiaz Humayun, Richard Baraniuk, Randall Balestriero and Bin Yu.
 
 <details><summary><b>Citation</b></summary>
 
-If you use ScaLES or any of the resources in this repo in your work, please use the following citation:
+If you use LES or any of the resources in this repo in your work, please use the following citation:
 
 ```bibtex
-@misc{ronen2024scales,
-      title={ScaLES: Scalable Latent Exploration Score for Pre-Trained Generative Networks}, 
-      author={Omer Ronen and Ahmed Imtiaz Humayun and Randall Balestriero and Richard Baraniuk and Bin Yu},
-      year={2024},
+@misc{ronen2025mitigatingoverexplorationlatentspace,
+      title={Mitigating over-exploration in latent space optimization using LES}, 
+      author={Omer Ronen and Ahmed Imtiaz Humayun and Richard Baraniuk and Randall Balestriero and Bin Yu},
+      year={2025},
       eprint={2406.09657},
       archivePrefix={arXiv},
-      primaryClass={id='cs.LG'}}
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2406.09657}, 
+}
 ```
 
 </details>
@@ -29,7 +31,7 @@ If you use ScaLES or any of the resources in this repo in your work, please use 
 - [Replication of results](#rep)
     - [Valid generation](#valid)
     - [Bayesian Optimization](#BO)
-- [Calculating ScaLES](#scales)
+- [Calculating LES](#les)
 - [License](#license)
 
 </details>
@@ -38,12 +40,12 @@ If you use ScaLES or any of the resources in this repo in your work, please use 
 
 Using [Anaconda](https://docs.anaconda.com/anaconda/install/index.html), first clone the current repository:
 ```bash
-git clone https://github.com/OmerRonen/scales.git
+git clone https://github.com/OmerRonen/les.git
 ```
 Then install the dependencies using:
 ```bash
 conda env create --file environment.yml
-conda activate scales
+conda activate les
 ```
 To use the [log-expected improvement acquisition function](https://arxiv.org/abs/2310.20708), you would have to manually clone and install the [BoTorch](https://github.com/pytorch/botorch) repository:
 ```bash
@@ -73,26 +75,30 @@ For replicating the results on the molecular datasets (SELFIES and SMILES), we r
 #### Valid generation <a name="valid"></a>
 The results in Table 1 can be replicated using:
 ```bash
-python -m scales.analysis.ood --dataset <DATASET> --output_dir <DIR>
+python -m les.analysis.ood <DATASET> <ARCHITECTURE> <BETA>
 ```
 
-where `<DATASET>` should be replaced with `expressions`, `smiles`, or `selfies`, and `<DIR>` with the output directory.
+where `<DATASET>` should be replaced with `expressions`, `smiles`, or `selfies`, `<ARCHITECTURE>` with `gru`, `lstm`, or `transformer` and `<BETA>` with `0.05`, `0.1` or `1`.
 
 #### Bayesian Optimization <a name="BO"></a>
 The Bayesian Optimization results in Section 4 can be replicated using the following CLI (see help for more details):
 ```bash
-scales.analysis.bo 
+python -m les.analysis.bo
 ```
 
-### Calculating ScaLES  <a name="scales"></a>
+### Calculating LES  <a name="les"></a>
 If you are interested in calculating ScaLES with a given pre-trained generative model, you can use the following code:
 
 ```python
-from scales.utils.scales import calculate_scales
-from scales.nets.utils import DATASETS, get_vae
-vae, vae_path = get_vae(DATASETS.expressions)
-X = torch.randn((5, vae.latent_dim))
-scales = calculate_scales(X = X, model = VAE.decoder)
+from les.nets.utils import get_vae
+from les.utils.les import LES
+dataset = "expressions"
+architecture = "gru"
+beta = "1"
+vae, _ = get_vae(dataset=dataset, architecture=architecture, beta=beta)
+les = LES(vae)
+z = torch.randn((5, vae.latent_dim))
+les_score = les(z)
 ```
 
 ### License <a name="license"></a>
