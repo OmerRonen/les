@@ -1,4 +1,4 @@
-name: scales
+name: les
 channels:
   - pytorch
   - conda-forge

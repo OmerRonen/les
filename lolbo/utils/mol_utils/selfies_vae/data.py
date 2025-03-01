@@ -85,6 +85,7 @@ class SELFIESDataset(Dataset):
         return torch.tensor([self.vocab2idx[s] for s in [*smiles, '<stop>']])
 
     def decode(self, tokens):
+        # print(tokens)
         dec = [self.vocab[t] for t in tokens]
         # Chop out start token and everything past (and including) first stop token
         stop = dec.index("<stop>") if "<stop>" in dec else None # want first stop token

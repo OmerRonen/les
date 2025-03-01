@@ -1,0 +1,28 @@
+# defaults:
+#   - model: vae
+#   - wandb: wandb
+
+model:
+  # _target_: models.vae.VAEGRUConv
+  _target_: models.vae.VAELSTMConv
+  # _target_: models.vae.VAETransformerConv
+  latent_dim: 56
+  dropout_rate: 0.2
+  eps_std: 0.001
+  vocab_size: 35
+  expression_length: 120
+  teacher_forcing: True
+  encoder_size: "large"
+  architecture: "lstm"
+
+train:
+  epochs: 300
+  batch_size: 256
+  learning_rate: 0.002
+  beta: 1
+
+dataset: "smiles"
+
+wandb:
+  project: "smiles_beta_p1_gru_lr001"
+  entity: "energy_splines"

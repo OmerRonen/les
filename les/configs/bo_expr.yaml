@@ -1,0 +1,30 @@
+# configs/bo_expr.yaml
+
+dataset: "expressions"  # Specify your dataset name
+
+vae:
+  architecture: "transformer"  # Specify the VAE architecture
+  beta: 1 # Default beta value for VAE
+  old: false # Boolean to indicate if the VAE is old
+
+opt:
+  runs: 2  # Specify the run type
+  rho: 1  # Default rho value
+  temperature: 1  # Default temperature value
+  seq_len: 120  # Default sequence length
+  # learning_rate:  0.5  # Default learning rate
+  n_steps: 6  # Number of optimization steps
+  n_batch: 20  # Batch size
+  k: 10  # Default value for k
+  tau: 1.0  # Default tau value
+  thres: 12  # Default threshold
+  option: 4  # Specify the optimization option
+  normalize_x: false  # Boolean to indicate if x should be normalized
+  objective: pdop  # Specify the objective function
+  n_gp: 500  # Number of Gaussian Processes
+  true_y: false # True y value for optimization
+
+# set the working directory to the parent directory in hydra
+hydra:
+  run:
+    dir: ../scales
