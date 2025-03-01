@@ -2,7 +2,6 @@ from functools import partial
 import os
 import fire
 import pandas as pd
-from tabulate import tabulate
 import numpy as np
 from sklearn.metrics import roc_auc_score
 import torch
@@ -78,7 +77,7 @@ def _calc_score_in_batches(z, scores_func, batch_size):
     return torch.cat(scores_list, dim=0)
 
 
-def get_methods_auc(model: VAE, dataset: torch.Tensor, model_name: str, batch_size=30):
+def get_methods_auc(model: VAE, dataset: torch.Tensor, model_name: str, batch_size=4):
     z_data = _encode_data(model, dataset)
     z_prior = torch.randn_like(z_data) * model.eps_std
     z_far = torch.randn_like(z_data) * 5 * model.eps_std
@@ -171,7 +170,7 @@ def get_tensor_data(ds, n=500, old=False):
 
 def main(dataset, architecture, beta):
     LOGGER.info(f"Dataset: {dataset}, architecture: {architecture}, beta: {beta}")
-    n = 200
+    n = 50
 
     dataset_tensor = get_tensor_data(dataset, n=n)
     vae, _ = get_vae(dataset=dataset, architecture=architecture, beta=beta)

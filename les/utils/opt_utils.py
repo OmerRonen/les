@@ -28,7 +28,7 @@ def _encode(X, vae, batch_size=32):
     return Z
 
 
-def _get_objective(Z, vae, black_box_function, dataset_name, batch_size=32):
+def get_objective(Z, vae, black_box_function, dataset_name, batch_size=32):
     X = []
     n_batches = int(np.ceil(len(Z) / batch_size))
     vae.decoder.eval()
@@ -43,20 +43,17 @@ def _get_objective(Z, vae, black_box_function, dataset_name, batch_size=32):
         X = F.one_hot(X, num_classes=vae.decoder.vocab_size).float()
     y = black_box_function(X).to(device=vae.device, dtype=vae.dtype)
     # make y into a numpy array
-    y = y.detach().cpu().numpy()
+    # y = y.detach().cpu().numpy()
     return y
 
 
 def get_black_box_function(dataset_name, norm=True, objective=None, old=False):
     if dataset_name == "expressions":
         return partial(get_black_box_objective_expression, black_box_dict={})
-        # black_box_dict=pickle.load(open("data/grammer/black_box_data.pickle", "rb")))
     elif dataset_name == "selfies":
-        # property = "logp"
         return partial(
             get_black_box_objective_molecules, property=objective, norm=norm, old=old
         )  # ,
-        # dict=pickle.load(open(f"data/molecules/{property}_dict.pkl", "rb")))
     elif dataset_name in ["smiles", "molecules"]:
         property = "logp"
         return partial(
@@ -113,10 +110,10 @@ def get_train_test_data(
     # LOGGER.debug(f"Z_train: {Z_train.shape}, Z_test: {Z_test.shape}")
 
     if true_y:
-        y_train = _get_objective(
+        y_train = get_objective(
             Z_train, vae, black_box_function, dataset_name, batch_size=batch_size
         )
-        y_test = _get_objective(
+        y_test = get_objective(
             Z_test, vae, black_box_function, dataset_name, batch_size=batch_size
         )
     else:

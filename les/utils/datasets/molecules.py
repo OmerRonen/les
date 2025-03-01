@@ -366,9 +366,11 @@ def get_black_box_objective_molecules(
             if x.shape[1] == len(vcb):
                 x = x.transpose(0, 1)
             if isinstance(x, torch.Tensor):
-                x = x.cpu().numpy()
+                x = x.detach().cpu().numpy()
             selfie = one_hot_to_eq(x, vcb, return_blanks=False)
+            # print(f"selfie: {selfie}")
             mol_str = sf.decoder(selfie)
+            # print(f"mol_str: {mol_str}")
         else:
             if x.shape[1] == len(VOCAB):
                 x = x.transpose(0, 1)

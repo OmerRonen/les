@@ -7,9 +7,11 @@ import torch
 from fire import Fire
 from tqdm import tqdm
 
+from les import LOGGER
 from les.nets.template import VAE
 from les.opt.turbo import TurboState, update_state
 from les.opt.utils import GPRegressionModel, train_dkl_model
+from les.utils.opt_utils import get_objective
 
 
 from .optimizer import AcquisitionOptimizer, OptimizerSpec
@@ -29,6 +31,38 @@ def normalize(z: torch.Tensor, lb: torch.Tensor, ub: torch.Tensor) -> torch.Tens
 
 def unnormalize(z: torch.Tensor, lb: torch.Tensor, ub: torch.Tensor) -> torch.Tensor:
     return z * (ub - lb) + lb
+
+
+def fit_mll(
+    model: gpytorch.models.ExactGP,
+    mll: gpytorch.mlls.ExactMarginalLogLikelihood,
+    Z: torch.Tensor,
+    y: torch.Tensor,
+    n_epochs: int = 100,
+):
+    model.train()
+    if torch.cuda.is_available():
+        model = model.cuda()
+        Z = Z.cuda()
+        y = y.cuda()
+        mll = mll.cuda()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
+    for _ in range(n_epochs):
+        # clear gradients
+        optimizer.zero_grad()
+        # forward pass through the model to obtain the output MultivariateNormal
+        output = model(Z)
+        # Compute negative marginal log likelihood
+        loss = -mll(output, y)
+        # back prop gradients
+        loss.backward()
+        optimizer.step()
+    model.eval()
+    if torch.cuda.is_available():
+        model = model.cpu()
+        Z = Z.cpu()
+        y = y.cpu()
+    return model
 
 
 class BOTracker:
@@ -81,6 +115,7 @@ class BOConfig:
     vae: VAE
     n_batch: int
     n_steps: int
+    dataset_name: str
     normalize: bool = False
     z_bounds: Optional[Tuple[float, float]] = None
     use_dkl: bool = False
@@ -112,6 +147,7 @@ class BayesianOptimizer:
 
     def normalize(self, z: torch.Tensor) -> torch.Tensor:
         if self._normalize_z:
+            LOGGER.info("Normalizing z")
             lb = torch.tensor(
                 [self._z_min] * z.shape[1], device=z.device, dtype=z.dtype
             )
@@ -132,22 +168,26 @@ class BayesianOptimizer:
             return unnormalize(z, lb, ub)
         return z
 
-    def _init_surr_model(self, Z: torch.Tensor, y: torch.Tensor):
-        if self.use_dkl:
+    def _init_surr_model(self, Z: torch.Tensor, y: torch.Tensor, train: bool = True):
+        if self.bo_config.use_dkl:
             likelihood = gpytorch.likelihoods.GaussianLikelihood()
             self._dkl_dim = 12
             model = GPRegressionModel(Z, y, likelihood, self._dkl_dim)
-            model, _ = train_dkl_model(model, likelihood, Z, y, training_iterations=200)
+            if train:
+                model, _ = train_dkl_model(
+                    model, likelihood, Z, y, training_iterations=200
+                )
             model.eval()
             likelihood.eval()
             self._model = model
             self.initialized = True
-        model = model.to(device=self.device, dtype=self.dtype)
         return model
 
     def acq_function(self, z: torch.Tensor) -> torch.Tensor:
-        best_f = self.y.max()
-        qei = qLogExpectedImprovement(model=self.gp, best_f=best_f)
+        best_f = torch.squeeze(self.y).max()
+        # make sure gp and z are on the same device
+        gp = self.gp.to(z.device)
+        qei = qLogExpectedImprovement(model=gp, best_f=best_f)
         return qei(z)
 
     def fit_gp(self):
@@ -157,16 +197,20 @@ class BayesianOptimizer:
         # remove nas
         na_idx_both = torch.squeeze(torch.isnan(y_fit))
         Z_fit = Z_fit[~na_idx_both, ...]
-        y_fit = y_fit[~na_idx_both, ...]
+        y_fit = torch.squeeze(y_fit[~na_idx_both, ...])
         likelihood = gpytorch.likelihoods.GaussianLikelihood()
         if self.bo_config.use_dkl:
-            model = self._init_surr_model(Z=Z_fit, y=y_fit)
+            model = self._init_surr_model(
+                Z=Z_fit, y=y_fit, train=hasattr(self, "_gp_state_dict")
+            )
+            if hasattr(self, "_gp_state_dict"):
+                model.load_state_dict(self._gp_state_dict)
+                return model.double()
             model.eval()
             likelihood.eval()
-            model = model.to(device=self.device, dtype=self.dtype)
-            # mll = mll.to(device=self.device, dtype=self.dtype)
+            self.gp = model
+            self._gp_state_dict = model.state_dict()
             return model.double()
-        # likelihood = gpytorch.likelihoods.GaussianLikelihood()
         else:
             model = SingleTaskGP(
                 train_X=Z_fit.double(),
@@ -177,7 +221,8 @@ class BayesianOptimizer:
             return model
         mll = ExactMarginalLogLikelihood(model.likelihood, model)
         mll.to(Z_fit)
-        fit_gpytorch_mll(mll)
+        model = fit_mll(model, mll, Z_fit, torch.squeeze(y_fit))
+        # model = fit_gpytorch_mll(mll)
         self._gp_state_dict = model.state_dict()
         self.gp = model
 
@@ -231,6 +276,8 @@ class BayesianOptimizer:
             z_next = self.unnormalize(z_next)
             is_valid = self.bo_config.vae.check_if_valid(z_next)
             x_next = self.bo_config.vae.decode(z_next)
+            if self.bo_config.dataset_name in ["selfies", "smiles"]:
+                x_next = x_next.argmax(dim=-1).long()
             y_next = self.bo_config.blackbox_function(x_next)
             na_idx = torch.isnan(y_next)
             self.tracker.add_solution(y_next, is_valid)
