@@ -101,8 +101,8 @@ class AcquisitionOptimizer:
         return candidate
 
     def optimize_lbfgs(self, z_init, objective):
-        lb = torch.tensor(self.optimizer_spec.bounds[0], dtype=z_init.dtype)
-        ub = torch.tensor(self.optimizer_spec.bounds[1], dtype=z_init.dtype)
+        lb = self.optimizer_spec.bounds[0].clone()
+        ub = self.optimizer_spec.bounds[1].clone()
         bounds = torch.stack([lb, ub], dim=0)
         z_new, _ = optimize_acqf(
             objective,

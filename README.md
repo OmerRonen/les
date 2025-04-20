@@ -85,7 +85,7 @@ python -m les.analysis.ood <DATASET> <ARCHITECTURE> <BETA>
 where `<DATASET>` should be replaced with `expressions`, `smiles`, or `selfies`, `<ARCHITECTURE>` with `gru`, `lstm`, or `transformer` and `<BETA>` with `0.05`, `0.1` or `1`.
 
 #### Bayesian Optimization <a name="BO"></a>
-The Bayesian Optimization results in Section 4 can be replicated using the following CLI (see help for more details):
+The Bayesian Optimization results in Section 4 can be replicated with (see `les/configs/bayes_opt.yaml` for run configuration):
 ```bash
 python -m les.analysis.bo
 ```
