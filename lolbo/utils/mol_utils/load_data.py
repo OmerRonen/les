@@ -9,7 +9,7 @@ def load_molecule_train_data(
     path_to_vae_statedict,
     num_initialization_points=10000,
 ): 
-    df = pd.read_csv("lolbo/utils/mol_utils/guacamol_data/guacamol_train_data_first_20k.csv")
+    df = pd.read_csv("/accounts/campus/omer_ronen/projects/lso_splines/lolbo/utils/mol_utils/guacamol_data/guacamol_train_data_first_20k.csv")
     df = df[0:num_initialization_points]
     train_x_smiles = df['smile'].values.tolist()
     train_x_selfies = df['selfie'].values.tolist() 
