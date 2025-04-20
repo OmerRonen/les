@@ -1,0 +1,41 @@
+# configs/bo_expr.yaml
+data:
+  dataset: "smiles"  # Specify your dataset name
+  objective: "pdop" # objective function affect the blackbox function only for the selfies dataset
+  n_init: 500 # number initial data points
+  seed: 42 # seed for the random number generator
+
+vae:
+  architecture: "transformer"  # Specify the VAE architecture
+  beta: 1 # Default beta value for VAE
+  pretrained: false # Boolean to indicate if the VAE is pretrained (only for the selfies dataset)
+
+optimizer:
+  method: "lbfgs" # optimizer method "ga" or "lbfgs"
+  n_steps: 10 # number of optimization steps (only for the ga optimizer)
+  alpha: 0.5 # langrange multiplier for the ga optimizer (only when there is a penalty)
+  learning_rate: 0.003 # only for the ga optimizer
+  penalty: "les" # only for the ga optimizer one of "none", "les", "prior" or "likelihood"
+  es_score: none # only for the ga optimizer one of "none", "prior", "uncertainty" or "les", "likelihood" or "prior"
+  es_threshold: 0.95 # only for the ga optimizer when es_score is not "none"
+  bounds: [-1, 1] # only for the lbfgs optimizer
+  use_turbo: true # only for the lbfgs optimizer (overrides the bounds)
+
+initializer:
+  use_turbo: true # use trust region for the optimization initializer
+
+turbo:
+  initial_length: 0.8 # initial length of the trust region
+  failure_tolerance: 2 # number of failures before the trust region is shrunk
+  success_tolerance: 10 # number of successes before the trust region is expanded
+
+bo:
+  n_batch: 10 # number of solution per batch
+  n_steps: 10 # number of bo steps
+  normalize_x: true # normalize the input space
+  z_bounds: [-3, 3] # bounds for the input space
+  use_dkl: false # use dkl for the input space
+
+hydra:
+  run:
+    dir: ../les

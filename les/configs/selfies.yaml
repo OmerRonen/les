@@ -1,0 +1,28 @@
+# defaults:
+#   - model: vae
+#   - wandb: wandb
+
+model:
+  # _target_: models.vae.VAEGRUConv
+  _target_: models.vae.VAELSTMConv
+  # _target_: models.vae.VAETransformerConv
+  latent_dim: 75
+  dropout_rate: 0.2
+  eps_std: 0.001
+  vocab_size: 146
+  expression_length: 72
+  teacher_forcing: True
+  encoder_size: "large"
+  architecture: "lstm"
+
+train:
+  epochs: 300
+  batch_size: 256
+  learning_rate: 0.001
+  beta: .05
+
+dataset: "selfies"
+
+wandb:
+  project: "selfies_beta_pp1_gru_lr0001"
+  entity: "energy_splines"

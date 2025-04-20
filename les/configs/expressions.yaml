@@ -1,0 +1,29 @@
+# defaults:
+#   - model: vae
+#   - wandb: wandb
+
+model:
+  # _target_: models.vae.VAEGRUConv
+  _target_: models.vae.VAELSTMConv
+  latent_dim: 25
+  dropout_rate: 0.2
+  eps_std: 0.1
+  vocab_size: 15
+  expression_length: 19
+  teacher_forcing: False
+  encoder_size: "small"
+  architecture: "transformer"
+
+
+train:
+  epochs: 300
+  batch_size: 128
+  learning_rate: 0.0005
+  beta: .05
+
+
+dataset: "expressions"
+
+wandb:
+  project: "expressions_beta_p1_transformer_all_tau"
+  entity: "energy_splines"

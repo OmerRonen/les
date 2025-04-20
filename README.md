@@ -63,8 +63,12 @@ This repository uses the expressions and SMILES datasets, both can be downloaded
 All the models used in our work can be found in the `trained_models` directory. The following command loads a pre-trained VAE for the expressions dataset:
 
 ```python
-from scales.nets.utils import DATASETS, get_vae
-vae, vae_path = get_vae(DATASETS.expressions)
+from les.nets.utils import get_vae
+from les.utils.les import LES
+dataset = "expressions"
+architecture = "gru"
+beta = "1"
+vae, _ = get_vae(dataset=dataset, architecture=architecture, beta=beta)
 ```
 
 ### Replication of results  <a name="rep"></a>
