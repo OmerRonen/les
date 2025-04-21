@@ -71,13 +71,18 @@ def main(cfg: DictConfig):
         initializer_spec=initializer_spec,
         optimizer_spec=optimizer_spec,
         turbo_config=turbo_config,
-        blackbox_function=get_black_box_function(cfg.data.dataset, cfg.data.objective),
+        blackbox_function=get_black_box_function(
+            dataset_name=cfg.data.dataset,
+            objective=cfg.data.objective,
+        ),
         vae=vae,
-        normalize=cfg.bo.normalize_x,
+        dataset_name=cfg.data.dataset,
+        normalize=cfg.optimizer.method == "lbfgs",
         z_bounds=cfg.bo.z_bounds,
         use_turbo=cfg.optimizer.use_turbo,
         n_batch=cfg.bo.n_batch,
         n_steps=cfg.bo.n_steps,
+        use_dkl=cfg.bo.use_dkl,
     )
     bo = BayesianOptimizer(bo_config)
     summary = bo.optimize()
