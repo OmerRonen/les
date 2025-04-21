@@ -28,7 +28,7 @@ VOCAB = yaml.load(open("data/molecules/vocab.yaml", "r"), Loader=yaml.FullLoader
 SELFIES_VOCAB = yaml.load(
     open("data/molecules/vocab_selfies.yaml", "r"), Loader=yaml.FullLoader
 )
-SELFIES_VOCAB_OLD = yaml.load(
+SELFIES_VOCAB_PRETRAINED = yaml.load(
     open("data/molecules/vocab_selfies_pretrained.yaml", "r"), Loader=yaml.FullLoader
 )
 
@@ -143,14 +143,14 @@ def compute_target_logP(smile, default_value, norm=True):
 
 
 def get_black_box_objective_molecules(
-    X, property, na_value=np.nan, is_selfies=True, norm=True, old=False
+    X, property, na_value=np.nan, is_selfies=True, norm=True, pretrained=False
 ):
     # convert from one hot to string
 
     oracle_values = []
     X = torch.squeeze(X)
     if is_selfies and len(X.shape) == 2:
-        vcb = SELFIES_VOCAB_OLD if old else SELFIES_VOCAB
+        vcb = SELFIES_VOCAB_PRETRAINED if pretrained else SELFIES_VOCAB
         X = F.one_hot(X, num_classes=len(vcb)).float()
     if len(X.shape) == 2:
         X = X.unsqueeze(0)
@@ -158,7 +158,7 @@ def get_black_box_objective_molecules(
     for i in range(X.shape[0]):
         x = X[i, ...]
         if is_selfies:
-            vcb = SELFIES_VOCAB if not old else SELFIES_VOCAB_OLD
+            vcb = SELFIES_VOCAB if not pretrained else SELFIES_VOCAB_PRETRAINED
             if x.shape[1] == len(vcb):
                 x = x.transpose(0, 1)
             if isinstance(x, torch.Tensor):

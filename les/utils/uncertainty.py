@@ -91,8 +91,8 @@ def calculate_uncertainty(X, model, n_models=10, n_preds=10, dataset="expression
         ).logsumexp(dim=1)
 
 
-def calculate_uncertainty_threshold(dataset_name, model, n_data=1000):
-    from les.utils.utils import get_train_test_data
+def calculate_uncertainty_threshold(dataset_name, model, n_data=1000, pretrained=False):
+    from les.utils.opt_utils import get_train_test_data
 
     (Z, _), _ = get_train_test_data(
         dataset_name,
@@ -100,6 +100,7 @@ def calculate_uncertainty_threshold(dataset_name, model, n_data=1000):
         sample_size=n_data,
         run=42,
         objective="pdop",
+        pretrained=pretrained,
     )
 
     uncertainty = calculate_uncertainty(Z, model).detach().cpu().numpy()
@@ -156,7 +157,9 @@ def save_uncertainty_thresholds():
             model = get_vae(dataset, model_name, 1, pretrained=True)
         else:
             model = get_vae(dataset, model_name, beta)
-        qunatiles = calculate_uncertainty_threshold(dataset, model, n_data=1000)
+        qunatiles = calculate_uncertainty_threshold(
+            dataset, model, n_data=1000, pretrained=beta == "pretrained"
+        )
         with open(f_name, "w") as f:
             yaml.dump(qunatiles, f)
 

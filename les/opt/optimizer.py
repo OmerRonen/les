@@ -87,10 +87,8 @@ class AcquisitionOptimizer:
             grad = grad * self.optimizer_spec.learning_rate
 
             if self.optimizer_spec.es_rule is not None:
-                if s == 0:
-                    _, score = self.optimizer_spec.es_rule(z.clone().cpu(), None)
                 z_proposed = z.clone().cpu() + grad.cpu()
-                es_vec, score = self.optimizer_spec.es_rule(z_proposed, score)
+                es_vec = self.optimizer_spec.es_rule(z_proposed)
                 es_vec = np.array([es_vec] * z.shape[1], dtype=int).T
                 es_vec = torch.tensor(es_vec).to(dtype=z.dtype)
 

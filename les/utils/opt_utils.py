@@ -8,7 +8,10 @@ import torch.nn.functional as F
 
 
 from les.utils.datasets.expressions import get_black_box_objective_expression
-from les.utils.datasets.molecules import get_black_box_objective_molecules
+from les.utils.datasets.molecules import (
+    SELFIES_VOCAB_PRETRAINED,
+    get_black_box_objective_molecules,
+)
 from les.utils.datasets.utils import get_dataset
 
 LOGGER = logging.getLogger("OptUtils")
@@ -19,7 +22,9 @@ def _encode(X, vae, batch_size=32):
     vae.encoder.eval()
     Z = []
     for batch in range(n_batches):
-        z_i = vae.encode(X[batch * batch_size : (batch + 1) * batch_size, ...]).detach()
+        X_batch = X[batch * batch_size : (batch + 1) * batch_size, ...]
+        z_i = vae.encode(X_batch).detach()
+
         # LOGGER.debug(f"z_i: {z_i.shape}")
         if len(z_i.shape) == 3 and z_i.shape[0] == 1:
             z_i = torch.squeeze(z_i, dim=0)
@@ -47,12 +52,15 @@ def get_objective(Z, vae, black_box_function, dataset_name, batch_size=32):
     return y
 
 
-def get_black_box_function(dataset_name, norm=True, objective=None, old=False):
+def get_black_box_function(dataset_name, norm=True, objective=None, pretrained=False):
     if dataset_name == "expressions":
         return partial(get_black_box_objective_expression, black_box_dict={})
     elif dataset_name == "selfies":
         return partial(
-            get_black_box_objective_molecules, property=objective, norm=norm, old=old
+            get_black_box_objective_molecules,
+            property=objective,
+            norm=norm,
+            pretrained=pretrained,
         )  # ,
     elif dataset_name in ["smiles", "molecules"]:
         property = "logp"
@@ -69,12 +77,18 @@ def get_black_box_function(dataset_name, norm=True, objective=None, old=False):
 
 
 def get_train_test_data(
-    dataset_name, sample_size, vae, true_y=False, run=None, objective=None, old=False
+    dataset_name,
+    sample_size,
+    vae,
+    true_y=False,
+    run=None,
+    objective=None,
+    pretrained=False,
 ):
-    dataset = get_dataset(dataset_name, old=old)
+    dataset = get_dataset(dataset_name, pretrained=pretrained)
     # vae, _ = get_vae(dataset_name)
     black_box_function = get_black_box_function(
-        dataset_name, objective=objective, old=old
+        dataset_name, objective=objective, pretrained=pretrained
     )
 
     train_data = dataset["train"]
@@ -93,7 +107,7 @@ def get_train_test_data(
     X_train = train_data[ind_run]
     X_test = train_data[ind_test]
 
-    old_selfies = dataset_name == "selfies" and old
+    old_selfies = dataset_name == "selfies" and pretrained
     if old_selfies:
         X_test = X_test.long()
         X_train = X_train.long()
@@ -104,8 +118,8 @@ def get_train_test_data(
 
     if old_selfies:
         # make into one hot again
-        X_train = F.one_hot(X_train, num_classes=vae.vocab_size).float()
-        X_test = F.one_hot(X_test, num_classes=vae.vocab_size).float()
+        X_train = F.one_hot(X_train, num_classes=len(SELFIES_VOCAB_PRETRAINED)).float()
+        X_test = F.one_hot(X_test, num_classes=len(SELFIES_VOCAB_PRETRAINED)).float()
 
     # LOGGER.debug(f"Z_train: {Z_train.shape}, Z_test: {Z_test.shape}")
 
