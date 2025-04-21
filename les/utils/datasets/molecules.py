@@ -22,6 +22,8 @@ from les import LOGGER
 from les.utils.utils import one_hot_encode, one_hot_to_eq
 
 
+MAX_LENGTH = 120
+MAX_LENGTH_SELFIES = 72
 VOCAB = yaml.load(open("data/molecules/vocab.yaml", "r"), Loader=yaml.FullLoader)
 SELFIES_VOCAB = yaml.load(
     open("data/molecules/vocab_selfies.yaml", "r"), Loader=yaml.FullLoader
@@ -201,8 +203,9 @@ def get_molecule_data(n=None, selfies=False, save=False):
                 f"File {f_name} not found, please make sure to download it from git"
             )
         # convert to one hot
+        max_length = MAX_LENGTH_SELFIES if selfies else MAX_LENGTH
         expressions_lst_oh = [
-            one_hot_encode(e, vcb, max_length=None) for e in tqdm(expressions_lst)
+            one_hot_encode(e, vcb, max_length=max_length) for e in tqdm(expressions_lst)
         ]
         max_len = max([e.shape[0] for e in expressions_lst_oh])
         LOGGER.info(f"Max length: {max_len}")
@@ -229,9 +232,10 @@ if __name__ == "__main__":
     # print(ds.shape)
     # # dataset = get_molecule_data(n=20000)
     # save vocab, vocab_selfies and vocab_selfies_old as yaml files
-    with open("data/molecules/vocab.yaml", "w") as f:
-        yaml.dump(VOCAB, f)
-    with open("data/molecules/vocab_selfies.yaml", "w") as f:
-        yaml.dump(SELFIES_VOCAB, f)
-    with open("data/molecules/vocab_selfies_pretrained.yaml", "w") as f:
-        yaml.dump(SELFIES_VOCAB_OLD, f)
+    data = get_molecule_data(n=2000)
+    # with open("data/molecules/vocab.yaml", "w") as f:
+    #     yaml.dump(VOCAB, f)
+    # with open("data/molecules/vocab_selfies.yaml", "w") as f:
+    #     yaml.dump(SELFIES_VOCAB, f)
+    # with open("data/molecules/vocab_selfies_pretrained.yaml", "w") as f:
+    #     yaml.dump(SELFIES_VOCAB_OLD, f)

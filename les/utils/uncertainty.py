@@ -92,14 +92,16 @@ def calculate_uncertainty(X, model, n_models=10, n_preds=10, dataset="expression
 
 
 def calculate_uncertainty_threshold(dataset_name, model, n_data=1000):
-    from les.utils.datasets.utils import get_dataset
+    from les.utils.utils import get_train_test_data
 
-    dataset = get_dataset(dataset_name)
-    # sample n_data from the dataset
-    ds_train = dataset["train"]
-    sample_idx = np.random.randint(0, len(ds_train), n_data)
-    X = ds_train[sample_idx]
-    Z = model.encode(X)
+    (Z, _), _ = get_train_test_data(
+        dataset_name,
+        vae=model,
+        sample_size=n_data,
+        run=42,
+        objective="pdop",
+    )
+
     uncertainty = calculate_uncertainty(Z, model).detach().cpu().numpy()
     # remove nans
     uncertainty = uncertainty[~np.isnan(uncertainty)]
@@ -146,14 +148,16 @@ def save_uncertainty_thresholds():
     quantiles_path = "data/uncertainty_thresholds"
     os.makedirs(quantiles_path, exist_ok=True)
     for dataset, model_name, beta in datasets:
+        f_name = os.path.join(quantiles_path, f"{dataset}_{model_name}_{beta}.yaml")
+        if os.path.exists(f_name):
+            print(f"Skipping {f_name} because it already exists")
+            continue
         if beta == "pretrained":
             model = get_vae(dataset, model_name, 1, pretrained=True)
         else:
             model = get_vae(dataset, model_name, beta)
         qunatiles = calculate_uncertainty_threshold(dataset, model, n_data=1000)
-        with open(
-            os.path.join(quantiles_path, f"{dataset}_{model_name}_{beta}.yaml"), "w"
-        ) as f:
+        with open(f_name, "w") as f:
             yaml.dump(qunatiles, f)
 
 
