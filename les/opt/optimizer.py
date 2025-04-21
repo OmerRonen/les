@@ -8,7 +8,7 @@ import torch
 
 from les.utils.les import LES, net_derivative
 
-from les.opt.utils import _normalize_grad
+from les.opt.utils import normalize_grad
 
 from botorch.optim.optimize import optimize_acqf
 
@@ -55,7 +55,7 @@ class AcquisitionOptimizer:
                     .requires_grad_(True)
                 )
                 grad_i = torch.autograd.grad(objective(z_grad_i), z_grad_i)[0].detach()
-                grad_i = _normalize_grad(grad_i, torch.ones_like(grad_i).mean(dim=1))
+                grad_i = normalize_grad(grad_i, torch.ones_like(grad_i).mean(dim=1))
                 if (
                     self.optimizer_spec.penalty is not None
                     and self.optimizer_spec.alpha > 0
@@ -74,7 +74,7 @@ class AcquisitionOptimizer:
                     else:
                         pen = self.optimizer_spec.penalty
                     grad_pen = torch.autograd.grad(pen(z_grad_i), z_grad_i)[0].detach()
-                    grad_pen = _normalize_grad(
+                    grad_pen = normalize_grad(
                         grad_pen, torch.ones_like(grad_pen).mean(dim=1)
                     )
                     grad_i += self.optimizer_spec.alpha * grad_pen

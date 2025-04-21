@@ -57,6 +57,8 @@ def main(cfg: DictConfig):
     train_idx = np.random.choice(np.arange(len(Z)), cfg.data.n_init, replace=False)
     Z_train = Z[train_idx, ...]
     y_train = y[train_idx].unsqueeze(-1)
+    if cfg.data.optimzer.use_turbo:
+        cfg.initializer.use_turbo = True
     initializer_spec = InitializerSpec(
         Z=Z_train,
         y=y_train,

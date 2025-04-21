@@ -7,7 +7,9 @@ import wandb
 import yaml
 
 from les import LOGGER
+from les.nets.selfies import TransformerVAE
 from les.nets.vaes import VAEGRUConv, VAELSTMConv, VAETransformerConv
+from lolbo.vae import get_trained_selfies_vae
 
 
 Datasets = namedtuple("DATASETS", ["expressions", "smiles", "selfies"])
@@ -133,7 +135,22 @@ def get_project_name(dataset, arch, lr, beta):
     return f"{dataset}_{arch}_lr_{lr}_b_{beta}_ronaldo"
 
 
-def get_vae(dataset, architecture, beta):
+def get_vae(dataset, architecture, beta, pretrained=False):
+    if pretrained:
+        if dataset != "selfies":
+            raise ValueError("Pretrained model is only available for selfies")
+        vae = get_trained_selfies_vae()
+        vae = TransformerVAE(vae)
+        LOGGER.info("SELFIES Pretrained model loaded")
+        if torch.cuda.is_available():
+            vae.trained_vae = vae.trained_vae.to(dtype=torch.float32, device="cuda")
+            vae.trained_vae.encoder = vae.trained_vae.encoder.to("cuda")
+            vae.trained_vae.decoder = vae.trained_vae.decoder.to("cuda")
+        else:
+            vae.trained_vae = vae.trained_vae.to(dtype=torch.float32, device="cpu")
+            vae.trained_vae.encoder = vae.trained_vae.encoder.to("cpu")
+            vae.trained_vae.decoder = vae.trained_vae.decoder.to("cpu")
+        return vae
     models_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
         "trained_models",
@@ -157,7 +174,7 @@ def get_vae(dataset, architecture, beta):
     model.load_state_dict(
         torch.load(weights_file, map_location=model.device, weights_only=True)
     )
-    return model, model_path
+    return model
 
 
 # def get_vae(dataset, architecture=None, beta=None):
