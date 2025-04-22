@@ -3,6 +3,7 @@ import numpy as np
 
 
 from omegaconf import DictConfig
+import yaml
 
 from les.nets.template import VAE
 from les.nets.utils import get_vae
@@ -12,6 +13,7 @@ from les.opt.optimizer import OptimizerSpec
 from les.opt.bo import BOConfig, BayesianOptimizer
 from les.utils.les import LES, Prior, Likelihood
 from les.utils.opt_utils import get_train_test_data, get_black_box_function
+from les.utils.uncertainty import calculate_uncertainty
 
 
 def get_penalty(penalty_name: str, vae: VAE):
@@ -27,8 +29,21 @@ def get_penalty(penalty_name: str, vae: VAE):
         raise ValueError(f"Penalty {penalty_name} not supported")
 
 
-def get_es_score(es_score_name: str, vae: VAE, quantile: float):
-    return None
+def get_es_score(dataset_name: str, beta: str, architecture: str, quantile: str):
+    vae = get_vae(dataset_name, architecture, beta)
+    quantiles_file = (
+        f"data/uncertainty_thresholds/{dataset_name}_{architecture}_{beta}.yaml"
+    )
+    uncertainty_quantile = yaml.load(open(quantiles_file), Loader=yaml.FullLoader)[
+        quantile
+    ]
+
+    def es_score(Z):
+        uc = calculate_uncertainty(Z, vae).detach().cpu().numpy()
+        below_thres = uc < uncertainty_quantile
+        return below_thres
+
+    return es_score
 
 
 @hydra.main(config_path="../configs", config_name="bayes_opt")
